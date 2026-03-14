@@ -1,0 +1,157 @@
+<po-page-default
+  [p-title]="tituloPagina"
+  [p-breadcrumb]="{ items: [{ label: 'Cadastro de Tarefas', link: '/tarefas' }, { label: tituloPagina }] }"
+  [p-actions]="[
+    { label: 'Salvar',   action: salvar.bind(this) },
+    { label: 'Cancelar', action: cancelar.bind(this) }
+  ]">
+
+  <po-loading-overlay [p-screen-lock]="isLoading"></po-loading-overlay>
+
+  <!-- Linha 1: Código | Título | Status -->
+  <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px;">
+    <div style="flex:0 0 200px;">
+      <po-input
+        name="codigo"
+        p-label="Código"
+        [(ngModel)]="tarefa.ZZG_CODIGO"
+        p-disabled="true">
+      </po-input>
+    </div>
+    <div style="flex:1; min-width:200px;">
+      <po-input
+        name="titulo"
+        p-label="Título"
+        p-placeholder="Informe o título da tarefa"
+        p-required="true"
+        p-max-length="50"
+        [(ngModel)]="tarefa.ZZG_TITULO">
+      </po-input>
+    </div>
+    <div style="flex:0 0 160px;">
+      <po-select
+        name="situacao"
+        p-label="Status"
+        p-required="true"
+        [p-options]="situacaoOptions"
+        [ngModel]="tarefa.ZZG_SITUAC"
+        (ngModelChange)="tarefa.ZZG_SITUAC = $event">
+      </po-select>
+    </div>
+  </div>
+
+  <!-- Linha 2: Descrição -->
+  <div style="margin-bottom:16px;">
+    <po-textarea
+      name="descricao"
+      p-label="Descrição"
+      p-placeholder="Descreva a tarefa"
+      [p-required]="true"
+      [p-rows]="4"
+      [(ngModel)]="tarefa.ZZG_DESCRI">
+    </po-textarea>
+  </div>
+
+  <!-- Linha 3: Datas e botão de suvtarefa -->
+  <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
+    <div style="flex:0 0 180px;">
+      <po-datepicker
+        name="dtInc"
+        p-label="Data de Criação"
+        p-disabled="true"
+        [(ngModel)]="tarefa.ZZG_DTINC">
+      </po-datepicker>
+    </div>
+    <div style="flex:0 0 180px;">
+      <po-datepicker
+        name="dtConc"
+        p-label="Data de Conclusão"
+        [(ngModel)]="tarefa.ZZG_DTCONC">
+      </po-datepicker>
+    </div>
+    <div style="padding-bottom:4px;">
+      <po-button
+        p-label="Adicionar Subtarefa"
+        (p-click)="abrirNovaSubtarefa()">
+      </po-button>
+    </div>
+  </div>
+
+  <!-- Grid de subtarefas -->
+  <po-divider p-label="Subtarefas"></po-divider>
+
+  <po-table
+    [p-columns]="colunasSubtarefas"
+    [p-items]="subAtivas"
+    [p-actions]="acoesSubtarefa">
+  </po-table>
+
+</po-page-default>
+
+
+<!-- Modal: Adicionar / Editar subtarefa -->
+<po-modal
+  #modalSubtarefa
+  [p-title]="tituloModalSub"
+  [p-primary-action]="acaoSalvarSub"
+  [p-secondary-action]="acaoCancelarSub"
+  p-size="md">
+
+  <div *ngIf="subEmEdicao" style="display:flex; flex-direction:column; gap:16px;">
+    <po-input
+      name="subDescri"
+      p-label="Descrição"
+      p-required="true"
+      p-max-length="50"
+      p-placeholder="Descrição da subtarefa"
+      [(ngModel)]="subEmEdicao.ZZH_DESCRI">
+    </po-input>
+
+    <div style="display:flex; gap:16px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:140px;">
+        <po-input
+          name="subRespon"
+          p-label="Responsável"
+          p-required="true"
+          p-max-length="50"
+          p-placeholder="Nome do responsável"
+          [(ngModel)]="subEmEdicao.ZZH_RESPON">
+        </po-input>
+      </div>
+      <div style="flex:1; min-width:140px;">
+        <po-select
+          name="subStatus"
+          p-label="Status"
+          p-required="true"
+          [p-options]="situacaoOptions"
+          [ngModel]="subEmEdicao.ZZH_STATUS"
+          (ngModelChange)="subEmEdicao.ZZH_STATUS = $event">
+        </po-select>
+      </div>
+      <div style="flex:1; min-width:140px;">
+        <po-datepicker
+          name="subDtConc"
+          p-label="Data de Conclusão"
+          [(ngModel)]="subEmEdicao.ZZH_DTCONC">
+        </po-datepicker>
+      </div>
+    </div>
+  </div>
+
+</po-modal>
+
+<!-- Modal: Confirmar exclusão de subtarefa -->
+<po-modal
+  #modalExcluirSub
+  p-title="Confirme a exclusão da subtarefa"
+  [p-primary-action]="acaoConfirmarExcluirSub"
+  [p-secondary-action]="acaoCancelarExcluirSub"
+  p-size="sm">
+
+  <p *ngIf="subParaExcluir">
+    Você está prestes a excluir a subtarefa
+    <strong>{{ subParaExcluir.ZZH_DESCRI }}</strong>.
+    Tem certeza que deseja continuar?
+  </p>
+
+</po-modal>

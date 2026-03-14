@@ -1,0 +1,8 @@
+{
+  "/rest": {
+    "target": "http://172.26.150.71:8084",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "info"
+  }
+}

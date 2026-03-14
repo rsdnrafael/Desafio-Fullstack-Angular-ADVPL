@@ -1,0 +1,15 @@
+<po-page-list
+  p-title="Cadastro de Tarefas"
+  [p-actions]="acoesPagina"
+  [p-filter]="filtroConfig">
+
+  <po-table
+    [p-columns]="colunas"
+    [p-items]="tarefas"
+    [p-loading]="isLoading"
+    [p-actions]="acoesLinha"
+    p-striped="true"
+    p-sort="true">
+  </po-table>
+
+</po-page-list>
