@@ -23,11 +23,11 @@ export class TarefasListComponent implements OnInit {
   filtro = '';
 
   colunas: PoTableColumn[] = [
-    { property: 'ZZG_CODIGO', label: 'Código',           width: '10%' },
+    { property: 'ZZG_CODIGO', label: 'Código',            width: '10%' },
     { property: 'ZZG_TITULO', label: 'Título',            width: '20%' },
     { property: 'ZZG_DESCRI', label: 'Descrição',         width: '28%' },
-    { property: 'ZZG_DTINC',  label: 'Data de Criação',   width: '12%', type: 'date', format: 'dd/MM/yyyy' },
-    { property: 'ZZG_DTCONC', label: 'Data de Conclusão', width: '12%', type: 'date', format: 'dd/MM/yyyy' },
+    { property: 'ZZG_DTINC',  label: 'Data de Criação',   width: '12%' },
+    { property: 'ZZG_DTCONC', label: 'Data de Conclusão', width: '12%' },
     {
       property: 'ZZG_SITUAC',
       label: 'Status',
@@ -41,7 +41,6 @@ export class TarefasListComponent implements OnInit {
     { label: 'Nova tarefa', action: () => this.router.navigate(['/tarefas/novo']), icon: 'po-icon-plus' },
   ];
 
-  // FIX 10: action deve ser Function, não string — inicializado no ngOnInit
   filtroConfig: PoPageFilter = {
     placeholder: 'Pesquisar por título ou descrição',
     action: () => {},
@@ -60,7 +59,6 @@ export class TarefasListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Agora que 'this' está disponível, atribuímos a função corretamente
     this.filtroConfig = {
       placeholder: 'Pesquisar por título ou descrição',
       action: (valor: string) => this.pesquisar(valor),
@@ -71,8 +69,8 @@ export class TarefasListComponent implements OnInit {
   carregar(): void {
     this.isLoading = true;
     this.service.listar(this.filtro).subscribe({
-      next: (res) => {
-        this.tarefas = res.items.map(item => item.ZZGMASTER);
+      next: (tarefas) => {
+        this.tarefas = tarefas;
         this.isLoading = false;
       },
       error: () => {
@@ -88,7 +86,8 @@ export class TarefasListComponent implements OnInit {
   }
 
   editar(tarefa: ZZGMaster): void {
-    this.router.navigate(['/tarefas', tarefa.ZZG_FILIAL, tarefa.ZZG_CODIGO]);
+    // Usa a pk que o próprio FWModel devolveu no GET lista
+    this.router.navigate(['/tarefas', tarefa.pk]);
   }
 
   confirmarExclusao(tarefa: ZZGMaster): void {
@@ -100,7 +99,7 @@ export class TarefasListComponent implements OnInit {
   }
 
   private excluir(tarefa: ZZGMaster): void {
-    this.service.excluir(tarefa.ZZG_FILIAL, tarefa.ZZG_CODIGO).subscribe({
+    this.service.excluir(tarefa.pk!).subscribe({
       next: () => {
         this.notification.success('Tarefa excluída com sucesso!');
         this.carregar();

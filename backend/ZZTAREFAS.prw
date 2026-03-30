@@ -28,18 +28,18 @@ User Function ZZTAREFAS()
 
 Return NIL
 
+
 Static Function MenuDef()
     Local aMenu := FwMvcMenu('ZZTAREFAS')
 Return aMenu
+
 
 Static Function ModelDef()
     Local oModel
     Local oStruZZG := FWFormStruct(1, 'ZZG')
     Local oStruZZH := FWFormStruct(1, 'ZZH')
 
-    oModel := MPFormModel():New('MZZTAREFAS',;
-        ,;//{|oModel| TskPreVld(oModel)}, ; // pre-validacao - preenche campos automaticos
-        {|oModel| TskPosVld(oModel)} ) // pos-validacao - regras de negocio
+    oModel := MPFormModel():New('MZZTAREFAS', , {|oModel| TskPosVld(oModel)})
 
     oModel:AddFields('ZZGMASTER', , oStruZZG)
     oModel:AddGrid('ZZHDETAIL', 'ZZGMASTER', oStruZZH)
@@ -81,59 +81,71 @@ Static Function ViewDef()
     //oView:AddIncrementField('VIEW_ZZG', 'ZZG_CODIGO')
     oView:AddIncrementField('VIEW_ZZH', 'ZZH_CODIGO')
 
-    oView:CreateHorizontalBox('SUPERIOR',  40)
+    oView:CreateHorizontalBox('SUPERIOR', 40)
     oView:CreateHorizontalBox('INFERIOR', 60)
 
     oView:SetOwnerView('VIEW_ZZG', 'SUPERIOR' )
     oView:SetOwnerView('VIEW_ZZH', 'INFERIOR')
 
-    oView:EnableTitleView('VIEW_ZZG', 'Tarefa'    )
+    oView:EnableTitleView('VIEW_ZZG', 'Tarefa')
     oView:EnableTitleView('VIEW_ZZH', 'SubTarefas')
 
 Return oView
 
 
-// Preenche campos automaticos na inclusao e garante a FK das subtarefas em qualquer operacao.
-Static Function TskPreVld(oModel)
-    Local oGrid    := oModel:GetModel('ZZHDETAIL')
-    Local cCodTar  := oModel:GetValue('ZZGMASTER', 'ZZG_CODIGO')
-    Local nI       := 0
-    Local aSave    := FWSaveRows()
-
-    If oModel:GetOperation() == 3
-        oModel:SetValue('ZZGMASTER', 'ZZG_USUINC', cUserName)
-        oModel:SetValue('ZZGMASTER', 'ZZG_DTINC',  Date()  )
-    EndIf
-
-    // Garante que cada subtarefa aponta para a tarefa correta.
-    For nI := 1 To oGrid:Length()
-        oGrid:GoLine(nI)
-        If ! oGrid:IsDeleted()
-            oGrid:SetValue('ZZH_CODTAR', cCodTar)
-        EndIf
-    Next nI
-
-    FWRestRows(aSave)
-
-Return .T.
-
-
 // Regras de negocio executadas ao confirmar a operacao.
 Static Function TskPosVld(oModel)
-    Local lRet       := .T.
-    Local oGrid      := oModel:GetModel('ZZHDETAIL')
-    Local cSituac    := oModel:GetValue('ZZGMASTER', 'ZZG_SITUAC')
-    Local dDtInc     := oModel:GetValue('ZZGMASTER', 'ZZG_DTINC' )
-    Local dDtConc    := oModel:GetValue('ZZGMASTER', 'ZZG_DTCONC')
-    Local nI         := 0
-    Local nAtivas    := 0 // subtarefas que contam - nao canceladas, nao apagadas
-    Local nConc      := 0 // subtarefas concluidas
-    Local nPendentes := 0 // subtarefas pendentes ou em andamento
-    Local aLinhas := FWSaveRows()
+    Local lRet          := .T.
+
+    Local oGrid         := oModel:GetModel('ZZHDETAIL')
+
+    Local cSituac       := oModel:GetValue('ZZGMASTER', 'ZZG_SITUAC')
+    Local cUsuario      := oModel:GetValue('ZZGMASTER', 'ZZG_USUINC')
+
+    Local dDtInc        := oModel:GetValue('ZZGMASTER', 'ZZG_DTINC' )
+    Local dDtConc       := oModel:GetValue('ZZGMASTER', 'ZZG_DTCONC')
+    Local dDtConcSub    := CToD('')
+
+    Local nOper         := oModel:GetOperation()
+    Local nI            := 0
+    Local nAtivas       := 0 // subtarefas que contam - nao canceladas, nao apagadas
+    Local nConc         := 0 // subtarefas concluidas
+    Local nPendentes    := 0 // subtarefas pendentes ou em andamento
+
+    Local aLinhas       := FWSaveRows()
+
+    // Data de inclusão e usuário são preenchidos automaticamente, caso não tenham sido preenchidos
+    If nOper == MODEL_OPERATION_INSERT 
+        If dDtInc == CToD('')
+            oModel:SetValue('ZZGMASTER', 'ZZG_DTINC',  Date())
+            dDtInc := Date()
+        EndIf
+        
+        If Empty(cUsuario)
+            oModel:SetValue('ZZGMASTER', 'ZZG_USUINC', cUsername)
+        EndIf
+
+        // Para o insert via PO-UI
+        If Empty(oModel:GetValue('ZZGMASTER', 'ZZG_CODIGO'))
+            oModel:SetValue('ZZGMASTER', 'ZZG_CODIGO', GetSXENum('ZZG', 'ZZG_CODIGO'))
+        EndIf
+    EndIf
+
+    // Se a situacao for concluida e a data de conclusao nao estiver preenchida, preenche com a data atual
+    If cSituac == '3' .And. dDtConc == CToD('')
+        dDtConc := Date()
+        oModel:SetValue('ZZGMASTER', 'ZZG_DTCONC', dDtConc)
+    EndIf
 
     // Data de conclusao nao pode ser anterior a data de inclusao
     If dDtConc != CToD('') .And. dDtInc != CToD('') .And. dDtConc < dDtInc
         Help(,, 'HELP',, 'A data de conclusao nao pode ser anterior a data de incluso.', 1, 0)
+        lRet := .F.
+    EndIf
+
+    // Data de conclusao so pode ser preenchida se a situacao for concluida
+    If lRet .And. cSituac != '3' .And. dDtConc != CToD('')
+        Help(,, 'HELP',, 'A data de conclusao da tarefa so pode ser preenchida quando a situacao estiver como concluida.', 1, 0)
         lRet := .F.
     EndIf
 
@@ -143,15 +155,29 @@ Static Function TskPosVld(oModel)
         If oGrid:IsDeleted()
             Loop
         EndIf
+
+        dDtConcSub := oGrid:GetValue('ZZH_DTCONC')
+
+        // Se a subtarefa estiver como concluida e a data de conclusao nao estiver preenchida, preenche com a data atual
+        If oGrid:GetValue('ZZH_STATUS') == '3' .And. dDtConcSub == CToD('')
+            dDtConcSub := Date()
+            oGrid:SetValue('ZZH_DTCONC', dDtConcSub)
+        EndIf
+
         Do Case
-        Case oGrid:GetValue('ZZH_STATUS') == '3' // Concluida
-            nAtivas++
-            nConc++
-        Case oGrid:GetValue('ZZH_STATUS') == '4' // Cancelada - nao interfere na conclusao da tarefa
-        Otherwise                                 // Pendente ou Em Andamento
-            nAtivas++
-            nPendentes++
+            Case oGrid:GetValue('ZZH_STATUS') == '3' // Concluida
+                nAtivas++
+                nConc++
+            Case oGrid:GetValue('ZZH_STATUS') == '4' // Cancelada - nao interfere na conclusao da tarefa
+            Otherwise                                 // Pendente ou Em Andamento
+                nAtivas++
+                nPendentes++
         EndCase
+
+        // Por algum motivo a filial não esta sendo preenchida na criação da Tarefa
+        If Empty(oGrid:GetValue('ZZH_FILIAL'))
+            oGrid:SetValue('ZZH_FILIAL', xFilial("ZZH"))
+        EndIf
     Next nI
 
     FWRestRows(aLinhas)
@@ -168,6 +194,15 @@ Static Function TskPosVld(oModel)
     // Se todas as subtarefas ativas foram concluidas, conclui a tarefa automaticamente
     If lRet .And. nAtivas > 0 .And. nConc == nAtivas
         oModel:SetValue('ZZGMASTER', 'ZZG_SITUAC', '3')
+        If oModel:GetValue('ZZGMASTER', 'ZZG_DTCONC') == CToD('')
+            oModel:SetValue('ZZGMASTER', 'ZZG_DTCONC', Date())
+        EndIf
     EndIf
+
+    //If lRet
+    //    ConfirmSX8()
+    //Else
+    //    RollBackSX8()
+    //EndIf
 
 Return lRet

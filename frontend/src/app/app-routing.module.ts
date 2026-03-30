@@ -5,10 +5,10 @@ import { TarefasListComponent } from './pages/tarefas/tarefas-list/tarefas-list.
 import { TarefasFormComponent } from './pages/tarefas/tarefas-form/tarefas-form.component';
 
 const routes: Routes = [
-  { path: '',                        redirectTo: '/tarefas', pathMatch: 'full' },
-  { path: 'tarefas',                 component: TarefasListComponent },
-  { path: 'tarefas/novo',            component: TarefasFormComponent },
-  { path: 'tarefas/:filial/:codigo', component: TarefasFormComponent },
+  { path: '',               redirectTo: '/tarefas', pathMatch: 'full' },
+  { path: 'tarefas',        component: TarefasListComponent },
+  { path: 'tarefas/novo',   component: TarefasFormComponent },
+  { path: 'tarefas/:pk',    component: TarefasFormComponent }, // pk já vem em Base64 do FWModel
 ];
 
 @NgModule({

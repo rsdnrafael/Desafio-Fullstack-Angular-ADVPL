@@ -1,6 +1,38 @@
-// Interfces que espelham exatamente os campos do SX3
-
 export type Situacao = '1' | '2' | '3' | '4';
+
+export interface FwField {
+  id:     string;
+  order?: number;
+  value:  string;
+}
+
+export interface FwSubModel {
+  id:        string;
+  modeltype: string;
+  fields?:   FwField[];
+  models?:   FwSubModel[]; 
+  items?:    FwGridItem[];  // linhas do grid
+}
+
+export interface FwGridItem {
+  id?:     number;    // id numérico atribuído pelo FWModel a cada linha existente
+  deleted: number;    // 0 = ativa, 1 = excluída
+  fields:  FwField[];
+}
+
+export interface FwResource {
+  id:        string;
+  operation: number;
+  pk:        string;
+  models:    FwSubModel[];
+}
+
+export interface FwModelListResponse {
+  total:      number;
+  count:      number;
+  startindex: number;
+  resources:  FwResource[];
+}
 
 export interface ZZGMaster {
   ZZG_FILIAL: string;
@@ -9,8 +41,9 @@ export interface ZZGMaster {
   ZZG_DESCRI: string;
   ZZG_SITUAC: Situacao;
   ZZG_USUINC: string;
-  ZZG_DTINC:  string;
-  ZZG_DTCONC: string;
+  ZZG_DTINC:  Date | null;
+  ZZG_DTCONC: Date | null;
+  pk?:        string;
 }
 
 export interface ZZHDetail {
@@ -20,48 +53,18 @@ export interface ZZHDetail {
   ZZH_DESCRI:  string;
   ZZH_RESPON:  string;
   ZZH_STATUS:  Situacao;
-  ZZH_DTCONC:  string;
-  deleted?: boolean; // linha marcada para exclusão antes de salvar
-}
-
-// Formato que o FWModel devolve no GET lista
-export interface FwModelListItem {
-  pk: string;
-  ZZGMASTER: ZZGMaster;
-}
-
-export interface FwModelListResponse {
-  total:   number;
-  hasNext: boolean;
-  items:   FwModelListItem[];
-}
-
-// Formato do GET individual
-export interface FwModelDetailResponse {
-  pk:     string;
-  models: {
-    ZZGMASTER: ZZGMaster;
-    ZZHDETAIL: ZZHDetail[];
-  };
-}
-
-// Payload para POST e PUT
-export interface FwModelSavePayload {
-  operation: 3 | 4;
-  models: {
-    ZZGMASTER: Partial<ZZGMaster>;
-    ZZHDETAIL: Partial<ZZHDetail>[];
-  };
+  ZZH_DTCONC:  Date | null;
+  deleted?:    boolean;
+  _fwItemId?:  number; // id numérico que o FWModel atribui — necessário para identificar linhas no PUT
 }
 
 export const SITUACAO_OPTIONS = [
-  { value: '1', label: 'Pendente'   },
-  { value: '2', label: 'Andamento'  },
-  { value: '3', label: 'Concluída'  },
-  { value: '4', label: 'Cancelada'  },
+  { value: '1', label: 'Pendente'  },
+  { value: '2', label: 'Andamento' },
+  { value: '3', label: 'Concluída' },
+  { value: '4', label: 'Cancelada' },
 ];
 
-// Labels coloridas
 export const SITUACAO_LABELS = [
   { value: '1', label: 'Pendente',  color: 'color-08' },
   { value: '2', label: 'Andamento', color: 'color-10' },

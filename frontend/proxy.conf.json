@@ -1,8 +1,11 @@
 {
   "/rest": {
-    "target": "http://172.26.150.71:8084",
+    "target": "http://172.27.52.197:8069",
     "secure": false,
     "changeOrigin": true,
-    "logLevel": "info"
+    "logLevel": "info",
+    "headers": {
+      "Authorization": "Basic YWRtaW46MTIzNDU2"
+    }
   }
 }

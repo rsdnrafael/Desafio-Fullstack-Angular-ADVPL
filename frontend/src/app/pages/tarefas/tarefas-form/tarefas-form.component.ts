@@ -7,15 +7,14 @@ import {
   PoTableAction,
   PoModalComponent,
   PoModalAction,
+  PoPageAction,
 } from '@po-ui/ng-components';
 
 import { TarefasService } from '../../../services/tarefas.service';
 import {
   ZZGMaster,
   ZZHDetail,
-  FwModelSavePayload,
   SITUACAO_OPTIONS,
-  Situacao,
 } from '../../../models/tarefa.model';
 
 @Component({
@@ -24,31 +23,48 @@ import {
 })
 export class TarefasFormComponent implements OnInit {
 
-  @ViewChild('modalSubtarefa', { static: true }) modalSubtarefa!: PoModalComponent;
+  @ViewChild('modalSubtarefa',  { static: true }) modalSubtarefa!:  PoModalComponent;
   @ViewChild('modalExcluirSub', { static: true }) modalExcluirSub!: PoModalComponent;
 
   isEdit    = false;
   isLoading = false;
+  pk        = '';
 
-  // Dados do formulário principal
   tarefa: Partial<ZZGMaster> = {
     ZZG_TITULO: '',
     ZZG_DESCRI: '',
     ZZG_SITUAC: '1',
-    ZZG_DTINC:  '',
-    ZZG_DTCONC: '',
+    ZZG_USUINC: '', 
+    ZZG_DTINC:  new Date(),
+    ZZG_DTCONC: null,
   };
 
   subtarefas: ZZHDetail[] = [];
+  subAtivas:  ZZHDetail[] = [];
 
-  // Estado do modal de subtarefa
-  subEmEdicao: Partial<ZZHDetail> = {};
-  subIndexEdicao = -1; // -1 = nova
+  subEmEdicao:    Partial<ZZHDetail> = {};
+  subIndexEdicao  = -1;
   subParaExcluir: ZZHDetail | null = null;
 
   situacaoOptions = SITUACAO_OPTIONS;
 
+  tituloPagina   = 'Cadastro de Tarefa';
+  tituloModalSub = 'Adicionar Subtarefa';
+
+  breadcrumb = {
+    items: [
+      { label: 'Cadastro de Tarefas', link: '/tarefas' },
+      { label: 'Cadastro de Tarefa' },
+    ],
+  };
+
+  acoesPagina: PoPageAction[] = [
+    { label: 'Salvar',   action: () => this.salvar()   },
+    { label: 'Cancelar', action: () => this.cancelar() },
+  ];
+
   colunasSubtarefas: PoTableColumn[] = [
+    { property: 'ZZH_CODIGO', label: 'Código', width: '10%' },
     { property: 'ZZH_DESCRI', label: 'Descrição',      width: '35%' },
     { property: 'ZZH_RESPON', label: 'Responsável',    width: '25%' },
     {
@@ -67,11 +83,10 @@ export class TarefasFormComponent implements OnInit {
   ];
 
   acoesSubtarefa: PoTableAction[] = [
-    { label: 'Editar',  action: (row: ZZHDetail) => this.abrirEdicaoSub(row)  },
+    { label: 'Editar',  action: (row: ZZHDetail) => this.abrirEdicaoSub(row)      },
     { label: 'Excluir', action: (row: ZZHDetail) => this.confirmarExcluirSub(row), type: 'danger' },
   ];
 
-  // Ações dos modais
   acaoSalvarSub: PoModalAction = {
     label: 'Salvar',
     action: () => this.salvarSubtarefa(),
@@ -93,46 +108,32 @@ export class TarefasFormComponent implements OnInit {
     action: () => this.modalExcluirSub.close(),
   };
 
-  get tituloPagina(): string {
-    return this.isEdit
-      ? `Editando tarefa: ${this.tarefa.ZZG_TITULO}`
-      : 'Cadastro de Tarefa';
-  }
-
-  get tituloModalSub(): string {
-    return this.subIndexEdicao === -1 ? 'Adicionar Subtarefa' : 'Editar Subtarefa';
-  }
-
-  // Subtarefas que não foram marcadas para exclusão
-  get subAtivas(): ZZHDetail[] {
-    return this.subtarefas.filter(s => !s.deleted);
-  }
-
   constructor(
-    private service: TarefasService,
-    private route: ActivatedRoute,
-    private router: Router,
+    private service:      TarefasService,
+    private route:        ActivatedRoute,
+    private router:       Router,
     private notification: PoNotificationService,
-    private dialog: PoDialogService,
+    private dialog:       PoDialogService,
   ) {}
 
   ngOnInit(): void {
-    const filial = this.route.snapshot.paramMap.get('filial');
-    const codigo = this.route.snapshot.paramMap.get('codigo');
-
-    if (filial && codigo) {
+    const pk = this.route.snapshot.paramMap.get('pk');
+    if (pk) {
       this.isEdit = true;
-      this.carregar(filial, codigo);
+      this.pk     = pk;
+      this.carregar(pk);
     }
+    this.atualizarView();
   }
 
-  carregar(filial: string, codigo: string): void {
+  carregar(pk: string): void {
     this.isLoading = true;
-    this.service.buscar(filial, codigo).subscribe({
-      next: (res) => {
-        this.tarefa     = { ...res.models.ZZGMASTER };
-        this.subtarefas = res.models.ZZHDETAIL ?? [];
-        this.isLoading  = false;
+    this.service.buscar(pk).subscribe({
+      next: ({ tarefa, subtarefas }) => {
+        this.tarefa     = { ...tarefa };
+        this.subtarefas = subtarefas;
+        this.atualizarView();
+        this.isLoading = false;
       },
       error: () => {
         this.notification.error('Erro ao carregar tarefa.');
@@ -144,18 +145,15 @@ export class TarefasFormComponent implements OnInit {
   salvar(): void {
     if (!this.validar()) return;
 
-    const payload: FwModelSavePayload = {
-      operation: this.isEdit ? 4 : 3,
-      models: {
-        ZZGMASTER: this.tarefa as ZZGMaster,
-        // Envia todas as linhas; o backend sabe o que excluir pelo campo deleted
-        ZZHDETAIL: this.subtarefas,
-      },
+    const tarefaParaSalvar: Partial<ZZGMaster> = {
+      ...this.tarefa,
+      // ZZG_DTCONC só pode ser preenchida quando concluída
+      ZZG_DTCONC: this.tarefa.ZZG_SITUAC === '3' ? this.tarefa.ZZG_DTCONC : null,
     };
 
     const op$ = this.isEdit
-      ? this.service.alterar(this.tarefa.ZZG_FILIAL!, this.tarefa.ZZG_CODIGO!, payload)
-      : this.service.incluir(payload);
+      ? this.service.alterar(this.pk, tarefaParaSalvar, this.subtarefas)
+      : this.service.incluir(tarefaParaSalvar, this.subtarefas);
 
     this.isLoading = true;
     op$.subscribe({
@@ -175,28 +173,45 @@ export class TarefasFormComponent implements OnInit {
     this.router.navigate(['/tarefas']);
   }
 
-  // ---------- Validações do lado cliente (espelham as do backend) ----------
-
   private validar(): boolean {
     if (!this.tarefa.ZZG_TITULO?.trim()) {
       this.notification.warning('O título da tarefa é obrigatório.');
       return false;
     }
-
     if (!this.tarefa.ZZG_DESCRI?.trim()) {
       this.notification.warning('A descrição da tarefa é obrigatória.');
       return false;
     }
-
-    if (this.tarefa.ZZG_DTCONC && this.tarefa.ZZG_DTINC) {
-      if (this.tarefa.ZZG_DTCONC < this.tarefa.ZZG_DTINC) {
-        this.notification.warning('A data de conclusão não pode ser anterior à data de inclusão.');
-        return false;
-      }
+    if (!this.tarefa.ZZG_SITUAC) {
+      this.notification.warning('A situação da tarefa é obrigatória.');
+      return false;
     }
 
-    // Não permite concluir com subtarefa pendente ou em andamento
-    const pendentes = this.subAtivas.filter(s => s.ZZH_STATUS === '1' || s.ZZH_STATUS === '2');
+    // ZZG_USUINC obrigatório
+    if (!this.tarefa.ZZG_USUINC?.trim()) {
+      this.notification.warning('O usuário de inclusão é obrigatório.');
+      return false;
+    }
+
+    const dtInc  = this.tarefa.ZZG_DTINC;
+    const dtConc = this.tarefa.ZZG_DTCONC;
+
+    // data de conclusão só quando concluída
+    if (dtConc && this.tarefa.ZZG_SITUAC !== '3') {
+      this.notification.warning('A data de conclusão só pode ser preenchida quando a situação for "Concluída".');
+      return false;
+    }
+
+    // data de conclusão não pode ser anterior à de inclusão
+    if (dtConc && dtInc && dtConc < dtInc) {
+      this.notification.warning('A data de conclusão não pode ser anterior à data de inclusão.');
+      return false;
+    }
+
+    const ativas    = this.subAtivas;
+    const pendentes = ativas.filter(s => s.ZZH_STATUS === '1' || s.ZZH_STATUS === '2');
+
+    // Regra 7 do ADVPL: não conclui com subtarefas pendentes
     if (this.tarefa.ZZG_SITUAC === '3' && pendentes.length > 0) {
       this.notification.warning(
         `Não é possível concluir a tarefa. Existem ${pendentes.length} subtarefa(s) pendente(s) ou em andamento.`
@@ -204,25 +219,45 @@ export class TarefasFormComponent implements OnInit {
       return false;
     }
 
-    // Auto-conclusão: se todas as subtarefas ativas estão concluídas, conclui a tarefa
-    if (this.subAtivas.length > 0 && this.subAtivas.every(s => s.ZZH_STATUS === '3')) {
+    // auto-conclusão quando todas as subtarefas estão concluídas
+    if (ativas.length > 0 && ativas.every(s => s.ZZH_STATUS === '3')) {
       this.tarefa.ZZG_SITUAC = '3';
     }
 
     return true;
   }
 
-  // ---------- Modal de Subtarefa ----------
+  private atualizarView(): void {
+    this.subAtivas = this.subtarefas.filter(s => !s.deleted);
+    this.tituloPagina = this.isEdit
+      ? `Editando: ${this.tarefa.ZZG_TITULO}`
+      : 'Cadastro de Tarefa';
+    this.breadcrumb.items[1].label = this.tituloPagina;
+  }
+
+  // Modal de Subtarefa
 
   abrirNovaSubtarefa(): void {
     this.subIndexEdicao = -1;
-    this.subEmEdicao = { ZZH_DESCRI: '', ZZH_RESPON: '', ZZH_STATUS: '1', ZZH_DTCONC: '' };
+    this.tituloModalSub = 'Adicionar Subtarefa';
+
+    const proximoCodigo = this.service.calcularProximoCodigoSub(this.subtarefas);
+
+    this.subEmEdicao = {
+      ZZH_CODIGO: proximoCodigo,
+      ZZH_DESCRI: '',
+      ZZH_RESPON: '',
+      ZZH_STATUS: '1',
+      ZZH_DTCONC: null,
+      // ZZH_CODTAR será preenchido no buildPayload com o valor de ZZG_CODIGO
+    };
     this.modalSubtarefa.open();
   }
 
   abrirEdicaoSub(sub: ZZHDetail): void {
     this.subIndexEdicao = this.subtarefas.indexOf(sub);
-    this.subEmEdicao = { ...sub };
+    this.tituloModalSub = 'Editar Subtarefa';
+    this.subEmEdicao    = { ...sub };
     this.modalSubtarefa.open();
   }
 
@@ -235,6 +270,10 @@ export class TarefasFormComponent implements OnInit {
       this.notification.warning('O responsável da subtarefa é obrigatório.');
       return;
     }
+    if (!this.subEmEdicao.ZZH_STATUS) {
+      this.notification.warning('O status da subtarefa é obrigatório.');
+      return;
+    }
 
     if (this.subIndexEdicao === -1) {
       this.subtarefas = [...this.subtarefas, this.subEmEdicao as ZZHDetail];
@@ -243,10 +282,9 @@ export class TarefasFormComponent implements OnInit {
       this.subtarefas = [...this.subtarefas];
     }
 
+    this.atualizarView();
     this.modalSubtarefa.close();
   }
-
-  // ---------- Exclusão de Subtarefa ----------
 
   confirmarExcluirSub(sub: ZZHDetail): void {
     this.subParaExcluir = sub;
@@ -255,12 +293,12 @@ export class TarefasFormComponent implements OnInit {
 
   excluirSubtarefa(): void {
     if (!this.subParaExcluir) return;
-    // Marca como deletada em vez de remover: o backend precisa saber que a linha foi excluída
     const idx = this.subtarefas.indexOf(this.subParaExcluir);
     if (idx !== -1) {
       this.subtarefas[idx] = { ...this.subtarefas[idx], deleted: true };
       this.subtarefas = [...this.subtarefas];
     }
+    this.atualizarView();
     this.subParaExcluir = null;
     this.modalExcluirSub.close();
   }
